@@ -1,0 +1,40 @@
+name: Validate GrewCharts
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate GrewCharts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check required files
+        run: |
+          test -s index.html
+          test -s grewcharts.html
+
+      - name: Check for accidentally committed environment files
+        run: |
+          if find . -type f \( -name ".env" -o -name ".env.local" -o -name ".env.production" \) | grep -q .; then
+            echo "Environment file detected!"
+            exit 1
+          fi
+
+      - name: Basic HTML structure check
+        run: |
+          grep -qi "<html" index.html
+          grep -qi "</html>" index.html
+          grep -qi "<html" grewcharts.html
+          grep -qi "</html>" grewcharts.html
