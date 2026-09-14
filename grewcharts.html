@@ -1,0 +1,1732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Footprint Terminal</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#ffffff;
+    --panel2:#12171c;
+    --line:#1d242b;
+    --text:#c7d0d6;
+    --dim:#5c6a74;
+    --dim2:#3a444c;
+    --green:#3ecf8e;
+    --green-dim:#1e4a38;
+    --red:#ef5b5b;
+    --red-dim:#4a2226;
+    --purple:#8b6fd9;
+    --amber:#e0a44d;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    overflow:hidden;}
+  .mono{font-family:ui-monospace,SFMono-Regular,"SF Mono",Consolas,"Roboto Mono",monospace;}
+  #app{display:flex;flex-direction:column;height:100%;}
+  #workbench{flex:1;display:flex;min-height:0;}
+
+  /* ---------- header ---------- */
+  #topbar{display:flex;align-items:center;gap:14px;padding:9px 14px;
+    background:#ffffff;border-bottom:1px solid #f2f2f2;flex-shrink:0;}
+  #brand{display:flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.2px;font-size:15px;}
+  #brand .dot{width:7px;height:7px;border-radius:50%;background:var(--amber);}
+  .sep{width:1px;height:20px;background:var(--line);}
+  .symgroup{display:flex;gap:4px;}
+  .symbol-select{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 30px 6px 10px;font-size:12.5px;font-weight:600;outline:none;cursor:pointer;}
+  .symbol-select:focus{border-color:var(--purple);}
+  #topbar{position:relative;}
+  #symbolDropdown{display:none;position:absolute;top:42px;left:14px;width:260px;max-height:420px;overflow:auto;background:#fff;border:1px solid #dedede;z-index:9999;color:#333;}
+  #symbolDropdown.open{display:block;}
+  .symbol-option{padding:7px 10px;font:12px ui-monospace,SFMono-Regular,Consolas,monospace;cursor:pointer;border-bottom:1px solid #eee;}
+  .symbol-option:hover{background:#f3f3f3;}
+  .symbol-option .muted{color:#888;font-size:10px;margin-left:7px;}
+  .pill{padding:5px 11px;border-radius:6px;font-size:12.5px;color:var(--dim);
+    background:transparent;border:1px solid transparent;cursor:pointer;user-select:none;}
+  .pill:hover{color:var(--text);}
+  .pill.active{background:var(--panel2);color:var(--text);border-color:var(--line);font-weight:600;}
+  #status{margin-left:auto;display:flex;align-items:center;gap:16px;font-size:12px;color:var(--dim);}
+  #statusdot{width:8px;height:8px;border-radius:50%;background:var(--dim2);transition:background .3s;}
+  #statusdot.live{background:var(--green);box-shadow:0 0 6px var(--green);}
+  #statusdot.sim{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+  #statusdot.err{background:var(--red);}
+  #price{font-size:19px;font-weight:700;}
+
+  /* ---------- toolbar row 2 ---------- */
+  #toolbar{display:flex;align-items:center;gap:22px;padding:8px 16px;
+    background:var(--panel);border-bottom:1px solid var(--line);flex-shrink:0;font-size:12px;}
+  .ctl-label{font-size:10.5px;letter-spacing:.6px;color:var(--dim);margin-right:8px;font-weight:600;}
+  .ctl{display:flex;align-items:center;}
+  .toggle{display:flex;align-items:center;gap:6px;cursor:pointer;color:var(--dim);}
+  .toggle input{accent-color:var(--amber);}
+  .toggle.on{color:var(--text);}
+
+  /* ---------- main layout ---------- */
+  #main{flex:1;display:flex;min-height:0;background:#ffffff;}
+  #chartcol{flex:1;display:flex;flex-direction:column;min-width:0;position:relative;}
+  #editor-tabs{height:35px;background:#ffffff;border-bottom:1px solid #f2f2f2;display:flex;align-items:stretch;flex-shrink:0;}
+  .editor-tab{display:flex;align-items:center;gap:8px;padding:0 14px;background:#ffffff;border-right:1px solid #f2f2f2;color:#fff;font-size:12px;border-top:1px solid #007acc;}
+  .editor-tab .tab-close{color:#777;margin-left:18px;}
+  #chartwrap{flex:1;position:relative;min-height:0;}
+  canvas{display:block;}
+  #volwrap{height:64px;border-top:1px solid var(--line);flex:0 0 64px;margin-top:auto;}
+
+  /* ---------- right ladder panel ---------- */
+  #ladder{width:230px;flex-shrink:0;background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;overflow:hidden;}
+  #ladderhead{padding:10px 12px 6px;border-bottom:1px solid var(--line);}
+  #ladderhead .t1{font-size:12px;font-weight:700;}
+  #ladderhead .t2{font-size:10.5px;color:var(--dim);margin-top:2px;}
+  #ladderrows{flex:1;overflow:hidden;position:relative;font-size:12px;}
+  .lrow{position:relative;display:flex;align-items:center;justify-content:space-between;
+    padding:0 10px;height:19px;line-height:19px;}
+  .lrow .bar{position:absolute;top:1px;bottom:1px;right:0;opacity:.28;}
+  .lrow.ask .bar{background:var(--red);}
+  .lrow.bid .bar{background:var(--green);}
+  .lrow .px{position:relative;z-index:1;}
+  .lrow .sz{position:relative;z-index:1;}
+  .lrow.ask .px{color:var(--red);}
+  .lrow.bid .px{color:var(--green);}
+  .lrow.mid{background:var(--panel2);}
+  .lrow.mid .px{color:#fff;font-weight:700;font-size:13px;}
+
+  /* ---------- bottom status ---------- */
+  #footer{display:flex;align-items:center;gap:22px;padding:6px 16px;background:var(--panel);
+    border-top:1px solid var(--line);font-size:11px;color:var(--dim);flex-shrink:0;}
+  #footer b{color:var(--text);}
+  #footer .up{color:var(--green);}
+  #footer .down{color:var(--red);}
+  #legend{margin-left:auto;display:flex;align-items:center;gap:10px;}
+  .lgchip{display:flex;align-items:center;gap:5px;}
+  .lgswatch{width:9px;height:9px;border-radius:2px;}
+
+/* ===== SAFE LIGHT, SHARP, INTEGRATED LAYOUT ===== */
+*{border-radius:0 !important;box-shadow:none !important}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#f6f4ee !important}
+body{color:#333333 !important}
+#app{
+  width:100vw !important;height:100vh !important;
+  display:flex !important;flex-direction:column !important;
+  background:#f8f6f0 !important;overflow:hidden !important;
+}
+#topbar{
+  flex:0 0 48px !important;min-height:48px !important;
+  background:#faf9f5 !important;border-bottom:1px solid #cbc7be !important;
+}
+#toolbar{
+  flex:0 0 40px !important;min-height:40px !important;
+  background:#f3f1eb !important;border-bottom:1px solid #cbc7be !important;
+}
+#workbench{
+  flex:1 1 auto !important;min-height:0 !important;
+  display:flex !important;background:#f8f6f0 !important;overflow:hidden !important;
+}
+#main{
+  flex:1 1 auto !important;min-width:0 !important;min-height:0 !important;
+  display:flex !important;background:#f8f6f0 !important;overflow:hidden !important;
+}
+#chartcol{
+  flex:1 1 auto !important;min-width:0 !important;min-height:0 !important;
+  display:flex !important;flex-direction:column !important;
+  border-right:1px solid #cbc7be !important;background:#f8f6f0 !important;
+}
+#chartwrap{
+  position:relative !important;flex:1 1 auto !important;min-height:0 !important;
+  background:#f8f6f0 !important;border-bottom:1px solid #cbc7be !important;
+  overflow:hidden !important;
+}
+#volwrap{
+  position:relative !important;flex:0 0 92px !important;height:92px !important;
+  background:#f2f0ea !important;border-top:0 !important;overflow:hidden !important;
+}
+#ladder{
+  flex:0 0 252px !important;width:252px !important;min-width:252px !important;
+  background:#f8f6f0 !important;border-left:0 !important;overflow:hidden !important;
+}
+#ladderhead{background:#f2f0ea !important;border-bottom:1px solid #cbc7be !important}
+#ladderrows,.lrow{background:#f8f6f0 !important}
+#footer{
+  flex:0 0 30px !important;min-height:30px !important;
+  background:#efede7 !important;border-top:1px solid #cbc7be !important;
+}
+canvas{display:block !important}
+#chartwrap canvas{background:#f8f6f0 !important}
+#volwrap canvas{background:#ffffff !important}
+
+/* light controls without altering their existing DOM */
+.symbol-select,.symgroup,.pill,.toggle{border-radius:0 !important}
+
+
+/* ===== CLEAN WHITE UI ===== */
+:root{
+  --bg:#ffffff;
+  --panel:#ffffff;
+  --panel2:#fafafa;
+  --line:#dedede;
+  --text:#343434;
+  --dim:#777777;
+  --dim2:#aaaaaa;
+}
+html,body,#app{background:#ffffff !important;color:#343434 !important}
+#topbar,#toolbar,#workbench,#main,#chartcol,#chartwrap,#ladder{
+  background:#ffffff !important;
+}
+#volwrap{background:#ffffff !important}
+#ladderhead,#footer{background:#fafafa !important}
+#topbar,#toolbar,#footer{border-color:#dedede !important}
+#chartcol{border-right-color:#dedede !important}
+#chartwrap{border-bottom-color:#dedede !important}
+#ladderhead{border-bottom-color:#dedede !important}
+.sep,#brand{display:none !important}
+#toolbar{
+  padding-left:12px !important;
+  gap:12px !important;
+}
+#toolbar .ctl-label{color:#777 !important}
+#toolbar .symgroup{
+  background:transparent !important;
+  border:0 !important;
+  padding:0 !important;
+}
+#toolbar .pill{
+  border:0 !important;
+  background:transparent !important;
+  color:#666 !important;
+  padding:5px 8px !important;
+}
+#toolbar .pill.active{
+  background:#eeeeee !important;
+  color:#222 !important;
+}
+#fpToggle,#candleToggle{display:none !important}
+canvas{background:#ffffff !important}
+#chartwrap canvas{background:#ffffff !important}
+#volwrap canvas{background:#ffffff !important}
+.lrow,#ladderrows{background:#ffffff !important}
+.lrow.mid{background:#f2f2f2 !important}
+
+
+/* ===== PURE WHITE — FORCE ALL SURFACES LIGHT ===== */
+html,body{background:#fff !important;color:#333 !important}
+body{color-scheme:light !important}
+#app,#topbar,#toolbar,#workbench,#main,#chartcol,#chartwrap,
+#volwrap,#ladder,#ladderhead,#ladderrows,#footer{
+  background:#fff !important;
+  color:#333 !important;
+}
+#volwrap{background:#ffffff !important}
+#footer,#ladderhead{background:#fafafa !important}
+canvas{background:#fff !important}
+#chart,#vol{background:#fff !important}
+
+
+/* ===== FULL-HEIGHT ORDER BOOK ===== */
+#ladder{align-self:stretch !important;height:100% !important}
+#ladderrows{flex:1 1 auto !important;min-height:0 !important;height:auto !important}
+.lrow{flex:0 0 19px !important}
+
+
+/* Repair: keep the order book as a fixed visible flex column. */
+#ladder{display:flex !important;flex-direction:column !important;min-height:0 !important;}
+#ladderhead{flex:0 0 auto !important;}
+#ladderrows{display:block !important;flex:1 1 auto !important;min-height:0 !important;overflow:hidden !important;}
+
+/* FINAL LAYOUT REPAIR: reserve a real column for the order book */
+#workbench,#main{min-width:0!important;min-height:0!important;}
+#chartcol{min-width:0!important;}
+#ladder{display:flex!important;flex:0 0 252px!important;width:252px!important;min-width:252px!important;min-height:0!important;height:auto!important;align-self:stretch!important;visibility:visible!important;}
+#ladderhead{display:block!important;flex:0 0 auto!important;}
+#ladderrows{display:block!important;flex:1 1 auto!important;min-height:0!important;overflow:hidden!important;visibility:visible!important;}
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <input class="symbol-select" id="symbolSearch" aria-label="Search Binance USD-M symbol" placeholder="Search USD-M symbol…" autocomplete="off">
+    <div id="symbolDropdown" class="symbol-dropdown"></div>
+    <div id="status">
+      <span id="price" class="mono">--</span>
+      <span style="display:flex;align-items:center;gap:7px;">
+        <span id="statusdot"></span><span id="statustext">connecting…</span>
+      </span>
+    </div>
+  </div>
+
+  <div id="toolbar">
+    <div class="ctl"><span class="ctl-label">INTERVAL</span><div class="symgroup" id="ivgroup"></div></div>
+  <div id="fpToggle" style="display:none"><input type="checkbox" checked></div>
+    <div id="candleToggle" style="display:none"><input type="checkbox" checked></div>
+  </div>
+
+  <div id="workbench">
+    <div id="main">
+      <div id="chartcol">
+        <div id="chartwrap"><canvas id="chart"></canvas></div>
+        <div id="volwrap"><canvas id="vol"></canvas></div>
+      </div>
+      <div id="ladder">
+      <div id="ladderhead">
+        <div class="t1">ORDER BOOK <span id="ladderSym" class="mono" style="color:var(--dim);font-weight:400;"></span></div>
+        <div class="t2">live depth · top 20</div>
+      </div>
+      <div id="ladderrows"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer">
+    <span>DEPTH &nbsp;B <b id="depthB" class="mono">--</b> &nbsp;A <b id="depthA" class="mono">--</b></span>
+    <span>DELTA <b id="delta" class="mono">--</b></span>
+    <span id="footersrc">SOURCE: --</span>
+    <div id="legend">
+      <div class="lgchip"><div class="lgswatch" style="background:var(--green);"></div>buy-dominant</div>
+      <div class="lgchip"><div class="lgswatch" style="background:var(--red);"></div>sell-dominant</div>
+      <div class="lgchip"><div class="lgswatch" style="background:var(--purple);"></div>balanced</div>
+    </div>
+  </div>
+
+</div>
+<script>
+(function(){
+
+/* ============================================================
+   CONFIG
+   ============================================================ */
+const SYMBOLS = [
+  {sym:'XRPUSDT', label:'XRP/USDT', tick:0.001, decimals:3, base:1.372},
+  {sym:'BTCUSDT', label:'BTC/USDT', tick:5,     decimals:1, base:64000},
+  {sym:'ETHUSDT', label:'ETH/USDT', tick:0.5,   decimals:2, base:3100},
+  {sym:'SOLUSDT', label:'SOL/USDT', tick:0.01,  decimals:2, base:148},
+];
+const INTERVALS = [
+  {k:'1m', ms:60000},{k:'5m', ms:300000},{k:'15m', ms:900000},
+  {k:'30m', ms:1800000},{k:'1h', ms:3600000},
+];
+
+let cfg = SYMBOLS[0];
+let interval = INTERVALS[2];
+let showFootprint = true;
+let showCandles = true;
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let ws = null;
+let simTimer = null;
+// Connection watchdog timers are kept in shared state so reconnects cannot leak stale timers.
+let failTimer = null;
+let stallTimer = null;
+let connState = 'connecting'; // connecting | live | sim | error
+let connectionGeneration = 0; // blocks stale async history/WS events
+let lastPrice = cfg.base;
+// Timestamp of the newest trade used for the live price.
+// Kline messages can arrive after aggTrades, so they must not roll the displayed price backward.
+let lastTradeAt = 0;
+let liveCandleTime = 0;
+let lastLivePriceAt = 0;
+let firstPrice = cfg.base;
+
+// candles keyed by openTime
+let candles = new Map();
+let candleOrder = [];
+
+// footprint: openTime -> Map(priceBucket -> {buy,sell})
+let footprint = new Map();
+// Independent background order-book/liquidity heatmap. This is NOT footprint data.
+let liquidityHeatmap = new Map(); // openTime -> Map(price -> liquidity)
+
+// live order book
+let bookBids = new Map(); // price -> qty
+let bookAsks = new Map();
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function fmtVol(n){
+  if(n>=1e6) return (n/1e6).toFixed(2)+'M';
+  if(n>=1e3) return (n/1e3).toFixed(1)+'k';
+  if(n<=0) return '';
+  return n.toFixed(0);
+}
+function fmtPrice(p){ return Number.isFinite(p) ? p.toFixed(cfg.decimals) : '—'; }
+function bucketPrice(p){
+  return Math.round(p / cfg.tick) * cfg.tick;
+}
+function bucketTime(t){
+  return Math.floor(t / interval.ms) * interval.ms;
+}
+function keyFor(p){ return p.toFixed(6); }
+function decimalsFromTick(tick){
+  const n=Number(tick);
+  if(!Number.isFinite(n) || n<=0) return 2;
+  const str=n.toString().toLowerCase();
+  if(str.includes('e-')) return Number(str.split('e-')[1]);
+  const dot=str.indexOf('.');
+  return dot<0 ? 0 : str.length-dot-1;
+}
+
+function getCandle(t){
+  let c = candles.get(t);
+  if(!c){
+    c = {t, o:null, h:-Infinity, l:Infinity, c:null, v:0};
+    candles.set(t, c);
+    candleOrder.push(t);
+    candleOrder.sort((a,b)=>a-b);
+    // keep memory bounded
+    while(candleOrder.length > 400){
+      const old = candleOrder.shift();
+      candles.delete(old);
+      footprint.delete(old);
+      liquidityHeatmap.delete(old);
+    }
+  }
+  return c;
+}
+function getFootCell(t, p){
+  let m = footprint.get(t);
+  if(!m){ m = new Map(); footprint.set(t, m); }
+  const k = keyFor(p);
+  let cell = m.get(k);
+  if(!cell){ cell = {buy:0, sell:0}; m.set(k, cell); }
+  return cell;
+}
+
+
+// Ensure the footprint is numerically populated at EVERY price level inside
+// the candle range. Missing levels are backfilled from the candle's known
+// total volume and directional profile; real trade cells are preserved.
+function backfillFootprintLevels(t, candle){
+  if(!candle || candle.o===null || !isFinite(candle.l) || !isFinite(candle.h)) return;
+  const m = footprint.get(t) || new Map();
+  footprint.set(t,m);
+
+  const first=Math.round(Math.min(candle.l,candle.h)/cfg.tick);
+  const last=Math.round(Math.max(candle.l,candle.h)/cfg.tick);
+  const levels=Math.max(1,last-first+1);
+
+  let existing=0, buySum=0, sellSum=0;
+  for(let i=first;i<=last;i++){
+    const cell=m.get(keyFor(i*cfg.tick));
+    if(cell){ const v=(cell.buy||0)+(cell.sell||0); if(v>0){ existing++; buySum+=cell.buy||0; sellSum+=cell.sell||0; } }
+  }
+
+  // Use the candle's total volume when available. For a live candle, do not
+  // reduce real prints; only add enough synthetic continuity to empty levels.
+  const target=Math.max((candle.v||0),buySum+sellSum,levels*1e-9);
+  const missing=Math.max(0,levels-existing);
+  if(missing===0) return;
+
+  const bullish=candle.c>=candle.o;
+  const residual=Math.max(target-(buySum+sellSum), target*0.22);
+  const base=residual/missing;
+
+  for(let i=first;i<=last;i++){
+    const p=i*cfg.tick, k=keyFor(p);
+    const cur=m.get(k);
+    if(cur && ((cur.buy||0)+(cur.sell||0))>0) continue;
+
+    const pos=levels===1?.5:(i-first)/(levels-1);
+    // Smooth profile: slightly heavier through the body/close, but every
+    // level receives a positive bid and ask value.
+    const closePos=Math.abs(p-candle.c)/Math.max(cfg.tick,candle.h-candle.l);
+    const shape=0.70+0.55*(1-Math.min(1,closePos));
+    const wave=0.88+0.12*Math.sin((i-first+1)*1.71+(t%997)*0.01);
+    const total=Math.max(base*shape*wave, target/(levels*45));
+    const directional=bullish ? (0.47+0.18*pos) : (0.53-0.18*pos);
+    const buy=total*Math.max(.18,Math.min(.82,directional));
+    m.set(k,{buy, sell:Math.max(total-buy,total*0.18)});
+  }
+}
+
+/* ============================================================
+   EVENT HANDLERS (shared by live WS + simulator)
+   ============================================================ */
+function updateLiveCandle(price, ts, volumeDelta=0){
+  if(!Number.isFinite(price)) return;
+  const t=bucketTime(Number(ts)||Date.now());
+  liveCandleTime=t;
+  const c=getCandle(t);
+  if(!Number.isFinite(c.o)){ c.o=price; c.h=price; c.l=price; }
+  c.h=Math.max(Number.isFinite(c.h)?c.h:price,price);
+  c.l=Math.min(Number.isFinite(c.l)?c.l:price,price);
+  c.c=price;
+  if(Number.isFinite(volumeDelta) && volumeDelta>0) c.v=(Number.isFinite(c.v)?c.v:0)+volumeDelta;
+  lastPrice=price;
+  lastLivePriceAt=Date.now();
+  updatePriceUI();
+}
+
+function handleKline(k){
+  const t=+k.t;
+  const o=parseFloat(k.o), h=parseFloat(k.h), l=parseFloat(k.l), cl=parseFloat(k.c), v=parseFloat(k.v);
+  const c=getCandle(t);
+  // Exchange kline is authoritative for the candle OHLC snapshot.
+  if(Number.isFinite(o)) c.o=o;
+  if(Number.isFinite(h)) c.h=h;
+  if(Number.isFinite(l)) c.l=l;
+  if(Number.isFinite(cl)) c.c=cl;
+  if(Number.isFinite(v)) c.v=Math.max(Number.isFinite(c.v)?c.v:0,v);
+  // Only let the currently open kline drive the displayed price. Do not let
+  // a delayed closed-bar snapshot freeze the live marker.
+  const nowBucket=bucketTime(Date.now());
+  if(t===nowBucket && Number.isFinite(cl) && (lastTradeAt===0 || Date.now()-lastLivePriceAt>1500)){
+    updateLiveCandle(cl, Date.now(), 0);
+  }
+}
+
+function handleTrade(p,q,isBuy,ts){
+  if(!Number.isFinite(p)) return;
+  const t=bucketTime(ts);
+  const pb=bucketPrice(p);
+  const cell=getFootCell(t,pb);
+  if(isBuy) cell.buy+=Number.isFinite(q)?q:0; else cell.sell+=Number.isFinite(q)?q:0;
+  lastTradeAt=Math.max(lastTradeAt,Number(ts)||Date.now());
+  updateLiveCandle(p,ts,Number.isFinite(q)?q:0);
+}
+
+function handleTicker(d){
+  const p=parseFloat(d && (d.c ?? d.lastPrice));
+  if(!Number.isFinite(p)) return;
+  // ticker is a fallback only; it must not overwrite fresh trades.
+  if(Date.now()-lastLivePriceAt>800) updateLiveCandle(p,Date.now(),0);
+}
+
+function handleDepth(bids, asks){
+  // Binance payloads can expose depth as bids/asks (REST/partial depth) or
+  // b/a in some stream formats. Normalize defensively so one malformed tick
+  // never stops the entire UI update loop.
+  bids = Array.isArray(bids) ? bids : [];
+  asks = Array.isArray(asks) ? asks : [];
+  bookBids = new Map(bids.map(([p,q])=>[parseFloat(p), parseFloat(q)]).filter(([p,q])=>Number.isFinite(p)&&Number.isFinite(q)));
+  bookAsks = new Map(asks.map(([p,q])=>[parseFloat(p), parseFloat(q)]).filter(([p,q])=>Number.isFinite(p)&&Number.isFinite(q)));
+  // feed the live snapshot into the current bar's liquidity heatmap so the
+  // freshest column reflects the *real* resting bid/ask sides, not a synthetic
+  // fill. Each snapshot replaces (rather than accumulates onto) that bar's
+  // map, since depth ticks arrive many times per bar and are not additive.
+  const t = bucketTime(Date.now());
+  const liveMap = new Map();
+  liquidityHeatmap.set(t, liveMap);
+  bookBids.forEach((q,p)=>{ const c=liveMap.get(keyFor(bucketPrice(p)))||{bid:0,ask:0}; c.bid+=q; liveMap.set(keyFor(bucketPrice(p)),c); });
+  bookAsks.forEach((q,p)=>{ const c=liveMap.get(keyFor(bucketPrice(p)))||{bid:0,ask:0}; c.ask+=q; liveMap.set(keyFor(bucketPrice(p)),c); });
+  renderLadder();
+  renderFooterDepth();
+}
+
+function isCurrentCandleBullish(){
+  const c = candles.get(bucketTime(Date.now()));
+  const open = c && Number.isFinite(c.o) ? c.o : firstPrice;
+  return Number.isFinite(open) ? lastPrice >= open : true;
+}
+
+function centerOnInitialLivePrice(){
+  if(viewport.autoCenter && Number.isFinite(lastPrice)){
+    viewport.priceCenter = lastPrice;
+    viewport.panY = 0;
+    viewport.autoCenter = false;
+  }
+}
+
+function updatePriceUI(){
+  const el = document.getElementById('price');
+  el.textContent = fmtPrice(lastPrice);
+  el.style.color = isCurrentCandleBullish() ? 'var(--green)' : 'var(--red)';
+}
+
+/* ============================================================
+   LIVE BINANCE CONNECTION (with simulated fallback)
+   ============================================================ */
+
+function getLiquidityCell(t,p){
+  let m=liquidityHeatmap.get(t); if(!m){m=new Map();liquidityHeatmap.set(t,m);}
+  const k=keyFor(bucketPrice(p));
+  let cell=m.get(k);
+  if(!cell){ cell={bid:0,ask:0}; m.set(k,cell); }
+  return cell;
+}
+
+function addLiquidity(t,p,bid,ask){
+  const cell=getLiquidityCell(t,p);
+  cell.bid+=bid; cell.ask+=ask;
+}
+
+function seedHistoricalLiquidity(c){
+  // Separate resting-liquidity field: horizontal bands around/through price.
+  // It intentionally does not use buy/sell footprint cells. Levels below the
+  // candle close read as resting bids (green side), levels above as resting
+  // asks (red side), matching a live order-book heatmap.
+  const span=Math.max(cfg.tick*8,c.h-c.l);
+  const levels=18;
+  for(let i=0;i<levels;i++){
+    const q=i/(levels-1);
+    const p=c.l-span*.35 + q*(span*1.7);
+    const dist=Math.abs(p-c.c)/Math.max(span,cfg.tick);
+    const wave=.35+.65*Math.abs(Math.sin((i+1)*1.73+(c.t%10000)*.00037));
+    const liquidity=Math.max(1,c.v*(.08+.92*wave)*Math.exp(-dist*.45));
+    // blend smoothly across the close so the boundary row reads as balanced/purple
+    const side=(c.c-p)/Math.max(cfg.tick*2, span*.12);
+    const bidFrac=clamp(0.5+side*0.5,0,1);
+    addLiquidity(c.t,p,liquidity*bidFrac,liquidity*(1-bidFrac));
+  }
+}
+
+function seedHistoricalFootprint(c){
+  // Binance klines do not contain historical bid/ask prints. For the prototype,
+  // distribute each candle's known OHLCV through its price range so the entire
+  // historical viewport has populated order-flow blocks instead of empty boxes.
+  const span=Math.max(cfg.tick, c.h-c.l);
+  const levels=Math.max(8,Math.min(36,Math.ceil(span/cfg.tick)+1));
+  const step=span/Math.max(1,levels-1);
+  const bullish=c.c>=c.o;
+  for(let i=0;i<levels;i++){
+    const p=bucketPrice(c.l+i*step);
+    const pos=levels<=1?.5:i/(levels-1);
+    // deterministic volume profile: heavier around body and close, lighter at tails
+    const bodyPos=Math.min(1,Math.abs(p-((c.o+c.c)/2))/Math.max(cfg.tick,Math.abs(c.c-c.o)+cfg.tick));
+    const shape=0.35+0.65*(1-Math.min(1,bodyPos));
+    const wave=0.75+0.25*Math.sin((i+1)*2.17+(c.t%997)/997);
+    const total=Math.max(c.v/levels*shape*wave, c.v/(levels*5));
+    const directional=(bullish ? (0.54+0.30*pos) : (0.46-0.30*pos));
+    const buy=total*Math.max(.08,Math.min(.92,directional));
+    const sell=total-buy;
+    const cell=getFootCell(c.t,p);
+    cell.buy+=buy; cell.sell+=sell;
+  }
+}
+
+async function loadHistorical(generation){
+  try{
+    const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${cfg.sym}&interval=${interval.k}&limit=400`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('history fetch failed');
+    const rows = await res.json();
+    if(generation !== connectionGeneration) return;
+    rows.forEach(r=>{
+      const t = +r[0];
+      const existing = candles.get(t);
+      // Do not let a late REST response overwrite a candle already being built
+      // by the live WebSocket (especially the currently open candle).
+      if(existing && existing.o !== null){
+        return;
+      }
+      const c = getCandle(t);
+      c.o=+r[1]; c.h=+r[2]; c.l=+r[3]; c.c=+r[4]; c.v=+r[5];
+      seedHistoricalFootprint(c);
+      seedHistoricalLiquidity(c);
+    });
+    if(rows.length){
+      // Preserve the live trade price if the WebSocket started updating while
+      // the REST history request was still in flight.
+      if(lastTradeAt === 0){
+        lastPrice=+rows[rows.length-1][4];
+        if(viewport.autoCenter) viewport.priceCenter=lastPrice;
+      }
+      firstPrice=+rows[0][1];
+      updatePriceUI();
+    }
+  }catch(e){
+    console.warn('Historical data unavailable', e);
+  }
+}
+
+function connect(){
+  const generation = ++connectionGeneration;
+  cleanupConnections();
+  candles.clear(); candleOrder = []; footprint.clear(); liquidityHeatmap.clear();
+  bookBids.clear(); bookAsks.clear();
+  firstPrice = lastPrice = cfg.base;
+  lastTradeAt = 0;
+  liveCandleTime = 0;
+  lastLivePriceAt = 0;
+  // Re-center once on the first real price for the new symbol/interval, then keep the axis fixed.
+  viewport.priceCenter = null;
+  viewport.panY = 0;
+  viewport.autoCenter = true;
+  setStatus('connecting', 'connecting…');
+  document.getElementById('footersrc').textContent = 'SOURCE: --';
+  // Load historical candles immediately; live WebSocket only supplies new ticks.
+  loadHistorical(generation);
+
+  const s = cfg.sym.toLowerCase();
+  const streams = [`${s}@kline_${interval.k}`, `${s}@aggTrade`, `${s}@ticker`, `${s}@bookTicker`, `${s}@markPrice@1s`, `${s}@depth20@100ms`].join('/');
+  const url = `wss://fstream.binance.com/stream?streams=${streams}`;
+
+  let opened = false;
+  let lastMessageAt = Date.now();
+  failTimer = setTimeout(()=>{
+    if(generation === connectionGeneration && !opened) startSimulation();
+  }, 4500);
+  stallTimer = setInterval(()=>{
+    if(generation === connectionGeneration && Date.now()-lastMessageAt > 7000 && !simTimer){
+      try{ ws && ws.close(); }catch(e){}
+      startSimulation();
+    }
+  }, 2500);
+
+  try{
+    ws = new WebSocket(url);
+  }catch(e){
+    if(failTimer){ clearTimeout(failTimer); failTimer=null; }
+    startSimulation();
+    return;
+  }
+
+  ws.onopen = ()=>{
+    if(generation !== connectionGeneration) return;
+    opened = true;
+    clearTimeout(failTimer);
+    setStatus('live', 'live · binance');
+    document.getElementById('footersrc').textContent = 'SOURCE: Binance WS';
+  };
+  ws.onerror = ()=>{
+    if(generation !== connectionGeneration) return;
+    clearTimeout(failTimer);
+    if(!simTimer) startSimulation();
+  };
+  ws.onclose = ()=>{
+    if(generation !== connectionGeneration) return;
+    clearTimeout(failTimer);
+    if(connState==='live' && !simTimer) startSimulation();
+  };
+  ws.onmessage = (ev)=>{
+    if(generation !== connectionGeneration) return;
+    lastMessageAt = Date.now();
+    // repeating watchdog stays active while feed is live
+    let msg;
+    try{ msg = JSON.parse(ev.data); }catch(e){ return; }
+    const d = msg.data; if(!d) return;
+    if(msg.stream.includes('@kline')){
+      handleKline(d.k);
+    }else if(msg.stream.includes('@aggTrade')){
+      const isBuy = d.m === false; // m=false -> buyer is taker -> buy pressure
+      handleTrade(parseFloat(d.p), parseFloat(d.q), isBuy, d.T);
+    }else if(msg.stream.includes('@bookTicker')){
+      const bid=parseFloat(d.b), ask=parseFloat(d.a);
+      if(Number.isFinite(bid) && Number.isFinite(ask) && ask>=bid) handleTicker({c:(bid+ask)/2});
+    }else if(msg.stream.includes('@ticker')){
+      handleTicker(d);
+    }else if(msg.stream.includes('@markPrice')){
+      handleTicker({c:d.p});
+    }else if(msg.stream.includes('@depth20')){
+      handleDepth(d.bids || d.b, d.asks || d.a);
+    }
+  };
+}
+
+// Safety net: if a feed message updated lastPrice but the active candle was not
+// present for the current interval, immediately materialize that candle. This
+// keeps the right-most candle visibly alive even during stream ordering races.
+setInterval(()=>{
+  if(!Number.isFinite(lastPrice)) return;
+  const now=Date.now();
+  const t=bucketTime(now);
+  const c=candles.get(t);
+  if(!c || !Number.isFinite(c.c) || c.c!==lastPrice){
+    updateLiveCandle(lastPrice, now, 0);
+  }
+}, 200);
+
+function cleanupConnections(){
+  if(ws){ try{ ws.onopen=ws.onclose=ws.onerror=ws.onmessage=null; ws.close(); }catch(e){} ws=null; }
+  if(failTimer){ try{ clearTimeout(failTimer); }catch(e){} failTimer=null; }
+  if(stallTimer){ try{ clearInterval(stallTimer); }catch(e){} stallTimer=null; }
+  if(simTimer){ clearInterval(simTimer); simTimer=null; }
+}
+
+/* ---- simulator: mimics the same message shapes so handlers are identical ---- */
+function startSimulation(){
+  if(simTimer) return;
+  if(ws){ try{ws.close();}catch(e){} ws=null; }
+  setStatus('sim', 'simulated feed');
+  document.getElementById('footersrc').textContent = 'SOURCE: Simulated (Binance unreachable from this sandbox)';
+
+  let price = cfg.base;
+  firstPrice = price;
+  let vol = 0;
+  const step = cfg.tick;
+
+  // seed some history so the chart isn't empty on load
+  const now = Date.now();
+  for(let i=40;i>=0;i--){
+    const t = bucketTime(now - i*interval.ms);
+    let p = price + (Math.random()-0.5)*step*40;
+    for(let j=0;j<25;j++){
+      const tp = p + (Math.random()-0.5)*step*10;
+      const isBuy = Math.random() > 0.48;
+      const q = Math.random()*Math.max(1, cfg.base/50)*(Math.random()<0.1?6:1);
+      handleTrade(tp, q, isBuy, t+j*1000);
+    }
+    price = p;
+  }
+  lastPrice = price;
+
+  simTimer = setInterval(()=>{
+    const now = Date.now();
+    const drift = (Math.random()-0.5) * step * 6;
+    price = Math.max(step, price + drift);
+    const isBuy = Math.random() > (0.5 - drift*0.02);
+    const q = Math.random()*Math.max(1, cfg.base/60) * (Math.random()<0.06 ? 8 : 1);
+    handleTrade(price, q, isBuy, now);
+
+    // fabricate a matching kline update for the open candle
+    const t = bucketTime(now);
+    const c = getCandle(t);
+    handleKline({t, o:c.o ?? price, h:Math.max(c.h,price), l:Math.min(c.l,price), c:price, v:(c.v||0)});
+
+    // fabricate a depth snapshot
+    const bids=[], asks=[];
+    for(let i=1;i<=20;i++){
+      bids.push([(price - i*step).toFixed(cfg.decimals), (Math.random()*Math.max(1,cfg.base/8)*(Math.random()<0.1?4:1)).toFixed(3)]);
+      asks.push([(price + i*step).toFixed(cfg.decimals), (Math.random()*Math.max(1,cfg.base/8)*(Math.random()<0.1?4:1)).toFixed(3)]);
+    }
+    handleDepth(bids, asks);
+  }, 220);
+}
+
+function setStatus(state, text){
+  connState = state;
+  const dot = document.getElementById('statusdot');
+  dot.className = state==='live' ? 'live' : state==='sim' ? 'sim' : state==='error' ? 'err' : '';
+  document.getElementById('statustext').textContent = text;
+}
+
+/* ============================================================
+   UI: symbol / interval buttons
+   ============================================================ */
+async function buildSymbolButtons(){
+  const input = document.getElementById('symbolSearch');
+  const dropdown = document.getElementById('symbolDropdown');
+  let allSymbols = [];
+
+  function render(query=''){
+    const q=query.trim().toUpperCase();
+    const matches=allSymbols.filter(x=>!q || x.sym.includes(q) || x.label.includes(q)).slice(0,250);
+    dropdown.innerHTML = matches.length ? matches.map(x=>
+      `<div class="symbol-option" data-symbol="${x.sym}"><b>${x.label}</b><span class="muted">${x.sym}</span></div>`
+    ).join('') : '<div class="symbol-option">No matching USD-M symbols</div>';
+    dropdown.classList.add('open');
+    dropdown.querySelectorAll('[data-symbol]').forEach(el=>el.onclick=()=>{
+      const next=allSymbols.find(x=>x.sym===el.dataset.symbol); if(!next)return;
+      cfg=next; input.value=next.label; dropdown.classList.remove('open');
+      document.getElementById('ladderSym').textContent=cfg.label; connect();
+    });
+  }
+
+  input.value=cfg.label;
+  input.oninput=()=>render(input.value);
+  input.onfocus=()=>render(input.value);
+  input.onkeydown=e=>{ if(e.key==='Escape') dropdown.classList.remove('open'); };
+  document.addEventListener('click',e=>{ if(!e.target.closest('#symbolSearch')&&!e.target.closest('#symbolDropdown')) dropdown.classList.remove('open'); });
+  document.getElementById('ladderSym').textContent=cfg.label;
+
+  try{
+    const res=await fetch('https://fapi.binance.com/fapi/v1/exchangeInfo');
+    if(!res.ok) throw new Error('exchangeInfo failed');
+    const data=await res.json();
+    allSymbols=(data.symbols||[])
+      .filter(x=>x.status==='TRADING' && x.contractType==='PERPETUAL')
+      .map(x=>({sym:x.symbol,label:`${x.baseAsset}/${x.quoteAsset}`,tick:parseFloat((x.filters||[]).find(f=>f.filterType==='PRICE_FILTER')?.tickSize||'0.01'),decimals:decimalsFromTick((x.filters||[]).find(f=>f.filterType==='PRICE_FILTER')?.tickSize||'0.01'),base:cfg.base}))
+      .sort((a,b)=>a.sym.localeCompare(b.sym));
+    const current=allSymbols.find(x=>x.sym===cfg.sym);
+    if(current) cfg={...cfg,...current};
+  }catch(err){
+    console.warn('USD-M symbol list unavailable; using fallback list',err);
+    allSymbols=[...SYMBOLS];
+  }
+}
+function buildIntervalButtons(){
+  const wrap = document.getElementById('ivgroup');
+  wrap.innerHTML='';
+  INTERVALS.forEach(iv=>{
+    const b = document.createElement('div');
+    b.className = 'pill' + (iv.k===interval.k?' active':'');
+    b.textContent = iv.k;
+    b.onclick = ()=>{ interval = iv; buildIntervalButtons(); connect(); };
+    wrap.appendChild(b);
+  });
+}
+document.getElementById('fpToggle').addEventListener('click', function(){
+  showFootprint = !showFootprint;
+  this.classList.toggle('on', showFootprint);
+  this.querySelector('input').checked = showFootprint;
+});
+document.getElementById('candleToggle').addEventListener('click', function(){
+  showCandles = !showCandles;
+  this.classList.toggle('on', showCandles);
+  this.querySelector('input').checked = showCandles;
+});
+
+/* ============================================================
+   RIGHT LADDER RENDER
+   ============================================================ */
+function renderLadder(){
+  const rowsEl = document.getElementById('ladderrows');
+  if(!rowsEl) return;
+  const h = Math.max(rowsEl.clientHeight || 0, 380);
+  const rowH = 19;
+  const visibleRows = Math.max(10, Math.floor(h / rowH));
+
+  // Keep the inside market first while selecting depth, then reverse asks only
+  // for display so the nearest ask remains adjacent to the MID row.
+  const asksAsc = [...bookAsks.entries()].filter(([,q])=>Number.isFinite(q)&&q>0).sort((a,b)=>a[0]-b[0]);
+  const bids = [...bookBids.entries()].filter(([,q])=>Number.isFinite(q)&&q>0).sort((a,b)=>b[0]-a[0]);
+  const askSlots = Math.max(1, Math.floor((visibleRows-1)/2));
+  const bidSlots = Math.max(1, visibleRows-1-askSlots);
+
+  // The MID row must follow the live inside market, not the last traded price.
+  // Binance depth updates can change best bid/ask even when no trade occurs.
+  const bestBid = bids.length ? bids[0][0] : NaN;
+  const bestAsk = asksAsc.length ? asksAsc[0][0] : NaN;
+  const liveMid = Number.isFinite(bestBid) && Number.isFinite(bestAsk)
+    ? (bestBid + bestAsk) / 2
+    : (Number.isFinite(bestBid) ? bestBid : (Number.isFinite(bestAsk) ? bestAsk : (Number.isFinite(lastPrice) ? lastPrice : cfg.base)));
+  const safePrice = liveMid;
+  const displayAsks = asksAsc.length ? asksAsc.slice(0,askSlots).reverse() : Array.from({length:askSlots},(_,i)=>[safePrice+(askSlots-i)*cfg.tick,0]);
+  const displayBids = bids.length ? bids.slice(0,bidSlots) : Array.from({length:bidSlots},(_,i)=>[safePrice-(i+1)*cfg.tick,0]);
+  const maxSize = Math.max(1,...displayAsks.map(x=>x[1]),...displayBids.map(x=>x[1]));
+
+  let html='';
+  displayAsks.forEach(([p,q])=>{
+    const w=q>0?Math.min(100,q/maxSize*100):0;
+    html+=`<div class="lrow ask"${q<=0?' style="opacity:.38"':''}><div class="bar" style="width:${w}%"></div><span class="px mono">${fmtPrice(p)}</span><span class="sz mono">${q>0?fmtVol(q):'—'}</span></div>`;
+  });
+  html+=`<div class="lrow mid"><span class="px mono">${fmtPrice(safePrice)}</span><span class="sz mono" style="color:var(--dim)">MID</span></div>`;
+  displayBids.forEach(([p,q])=>{
+    const w=q>0?Math.min(100,q/maxSize*100):0;
+    html+=`<div class="lrow bid"${q<=0?' style="opacity:.38"':''}><div class="bar" style="width:${w}%"></div><span class="px mono">${fmtPrice(p)}</span><span class="sz mono">${q>0?fmtVol(q):'—'}</span></div>`;
+  });
+  rowsEl.innerHTML=html;
+}
+function findNear(map, p){
+  // depth20 levels may not land exactly on our tick grid; snap to nearest key within half a tick
+  let best=null, bestd=cfg.tick*0.6;
+  map.forEach((v,k)=>{ const d=Math.abs(k-p); if(d<bestd){bestd=d; best=v;} });
+  return best;
+}
+
+function renderFooterDepth(){
+  let b=0,a=0;
+  bookBids.forEach((q,p)=> b += q*p);
+  bookAsks.forEach((q,p)=> a += q*p);
+  document.getElementById('depthB').textContent = fmtVol(b);
+  document.getElementById('depthB').style.color = 'var(--green)';
+  document.getElementById('depthA').textContent = fmtVol(a);
+  document.getElementById('depthA').style.color = 'var(--red)';
+  const d = b-a;
+  const dEl = document.getElementById('delta');
+  dEl.textContent = (d >= 0 ? '+' : '-') + fmtVol(Math.abs(d));
+  dEl.style.color = d>=0 ? 'var(--green)' : 'var(--red)';
+}
+
+/* ============================================================
+   MAIN CHART CANVAS
+   ============================================================ */
+const chartCanvas = document.getElementById('chart');
+const chartCtx = chartCanvas.getContext('2d');
+const volCanvas = document.getElementById('vol');
+const volCtx = volCanvas.getContext('2d');
+
+function resizeCanvases(){
+  const wrap = document.getElementById('chartwrap');
+  const dpr = window.devicePixelRatio || 1;
+  [ [chartCanvas, wrap], [volCanvas, document.getElementById('volwrap')] ].forEach(([cv, box])=>{
+    const r = box.getBoundingClientRect();
+    cv.width = Math.max(1, Math.floor(r.width*dpr));
+    cv.height = Math.max(1, Math.floor(r.height*dpr));
+    cv.style.width = r.width+'px';
+    cv.style.height = r.height+'px';
+    cv.getContext('2d').setTransform(dpr,0,0,dpr,0,0);
+  });
+}
+window.addEventListener('resize', resizeCanvases);
+
+// Apply the independent browser-style chart scale. Canvas coordinates remain
+// virtual so 90% fits more of the complete chart into the same screen area and
+// 110% enlarges the entire chart layout uniformly.
+function applyRenderScale(ctx){
+  const dpr = window.devicePixelRatio || 1;
+  const scale = viewport.layoutScale || 1;
+  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, 0, 0);
+}
+
+// Switch temporarily to physical screen coordinates. Use this for fixed UI
+// such as the price axis and the lower definition boxes so browser-style
+// pinch scaling never changes their width, height, or font size.
+function applyScreenTransform(ctx){
+  const dpr = window.devicePixelRatio || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+
+/* ============================================================
+   INTERACTIVE VIEWPORT — cursor anchored zoom + pan
+   ============================================================ */
+const viewport = {
+  zoomX: 1,
+  zoomY: 1,
+  panX: 0,       // in candle columns; negative = move into history
+  panY: 0,       // in price ticks
+  priceCenter: null, // fixed Y-axis center
+  dragging: false,
+  dragMode: null,
+  dragX: 0,
+  dragY: 0,
+  hoverX: null,
+  hoverY: null,
+  // Browser-style visual scale for the whole chart layout (100%, 90%, etc.).
+  // Kept separate from panX/panY and zoomX/zoomY.
+  layoutScale: 1
+};
+
+const BASE_COL_W = 78;
+const BASE_ROW_H = 22;
+// Do not allow zooming out far enough for adjacent candle/footprint boxes to overlap.
+const MIN_ZOOM_X = 0.62;
+const AXIS_W = 62;
+const RIGHT_PAD = 26;
+
+function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+// layoutScale is a true browser-style visual scale for the chart surface.
+// It does NOT alter zoomX/zoomY, panX/panY, footprint values, or order-flow data.
+// Rendering uses a virtual viewport and scales the entire chart uniformly.
+function colWidthFor(){ return BASE_COL_W * viewport.zoomX; }
+function rowHeightFor(){ return BASE_ROW_H * viewport.zoomY; }
+
+function chartGeometry(){
+  const scale = viewport.layoutScale;
+  // The plot is browser-scaled, but the price-axis strip keeps a fixed
+  // physical width on screen. axisW is therefore expressed in virtual units.
+  const W = chartCanvas.clientWidth / scale, H = chartCanvas.clientHeight / scale;
+  const axisW = AXIS_W / scale;
+  const rightPad = RIGHT_PAD;
+  const plotW = Math.max(1, W - axisW);
+  const latest = Math.max(0, candleOrder.length - 1);
+  const colW = colWidthFor();
+  const rowH = rowHeightFor();
+  const anchorX = plotW - rightPad;
+  // Keep the Y-axis center independent of every incoming live tick.
+  // This lets the candle move inside a stable price scale.
+  // Before the first real market price arrives, render around lastPrice without
+  // permanently locking the scale to the symbol's placeholder/base price.
+  const mid = (viewport.priceCenter ?? lastPrice) + viewport.panY * cfg.tick;
+  return {W,H,plotW,latest,colW,rowH,anchorX,mid,axisW,rightPad};
+}
+
+function indexAtX(x, g){
+  return g.latest - viewport.panX + (x - g.anchorX) / g.colW;
+}
+
+function priceAtY(y, g){
+  return g.mid + ((g.H/2 - y) / g.rowH) * cfg.tick;
+}
+
+function xOfIndex(idx, g){
+  return g.anchorX + (idx - g.latest + viewport.panX) * g.colW;
+}
+
+function yOfPrice(p, g){
+  return g.H/2 - ((p - g.mid) / cfg.tick) * g.rowH;
+}
+
+function installChartInteractions(){
+  const wrap = document.getElementById('chartwrap');
+  wrap.style.cursor = 'crosshair';
+  // Prevent browser touch/gesture handling from stealing pointer drags.
+  chartCanvas.style.touchAction = 'none';
+  chartCanvas.style.userSelect = 'none';
+
+  chartCanvas.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+
+    // IMPORTANT: Chrome/macOS trackpad pinch is delivered as a WheelEvent with
+    // ctrlKey=true (not as two PointerEvents). Treat ONLY that gesture as the
+    // browser-style overall chart scale: 100% -> 90% / 110%.
+    // Normal two-finger up/down scrolling must continue to use the existing
+    // chart behavior and must never change layoutScale.
+    if (e.ctrlKey) {
+      const factor = Math.exp(-e.deltaY * 0.0015);
+      viewport.layoutScale = clamp(viewport.layoutScale * factor, 0.55, 1.80);
+      return;
+    }
+
+    const rect = chartCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / viewport.layoutScale;
+    const y = (e.clientY - rect.top) / viewport.layoutScale;
+    const g0 = chartGeometry();
+
+    // Two-finger trackpad horizontal movement pans the time axis.
+    if(Math.abs(e.deltaX) > Math.abs(e.deltaY) * 0.35){
+      viewport.panX -= e.deltaX / g0.colW;
+      return;
+    }
+
+    // Vertical wheel/trackpad movement continues to zoom the horizontal time axis.
+    const idx = indexAtX(x, g0);
+    const price = priceAtY(y, g0);
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    viewport.zoomX = clamp(viewport.zoomX * factor, MIN_ZOOM_X, 8);
+
+    const g1 = chartGeometry();
+    viewport.panX = g1.latest + (x - g1.anchorX)/g1.colW - idx;
+    viewport.panY = (price - (viewport.priceCenter ?? lastPrice))/cfg.tick - ((g1.H/2 - y)/g1.rowH);
+  }, {passive:false});
+
+  // True pinch gesture: browser-style chart layout scaling (100%, 90%, 110%).
+  // This is intentionally separate from directional wheel scrolling and the
+  // existing panX/panY + zoomX/zoomY viewport values.
+  const activePointers = new Map();
+  let pinch = null;
+  const pointerPos = e => ({x:e.clientX, y:e.clientY});
+  const beginPinch = ()=>{
+    if(activePointers.size !== 2) return;
+    const pts=[...activePointers.values()];
+    const dist=Math.max(1,Math.hypot(pts[1].x-pts[0].x,pts[1].y-pts[0].y));
+    pinch={dist, layoutScale:viewport.layoutScale};
+    viewport.dragging=false; viewport.dragMode='pinch';
+  };
+  const updatePinch = ()=>{
+    if(!pinch || activePointers.size!==2) return;
+    const pts=[...activePointers.values()];
+    const dist=Math.max(1,Math.hypot(pts[1].x-pts[0].x,pts[1].y-pts[0].y));
+    // Example: 1.00 = 100%, 0.90 = 90%, 1.10 = 110%.
+    viewport.layoutScale=clamp(pinch.layoutScale*(dist/pinch.dist),0.55,1.8);
+  };
+  chartCanvas.addEventListener('pointerdown', e=>{
+    activePointers.set(e.pointerId,pointerPos(e));
+    if(activePointers.size===2){ beginPinch(); return; }
+  });
+  chartCanvas.addEventListener('pointermove', e=>{
+    if(!activePointers.has(e.pointerId)) return;
+    activePointers.set(e.pointerId,pointerPos(e));
+    if(activePointers.size===2){ updatePinch(); }
+  });
+  const endPinch=e=>{
+    activePointers.delete(e.pointerId);
+    if(activePointers.size<2 && pinch){ pinch=null; if(viewport.dragMode==='pinch') viewport.dragMode=null; }
+  };
+  chartCanvas.addEventListener('pointerup',endPinch);
+  chartCanvas.addEventListener('pointercancel',endPinch);
+
+  chartCanvas.addEventListener('pointerdown', (e)=>{
+    if(activePointers.size >= 2) return;
+    e.preventDefault();
+    viewport.autoCenter = false;
+    const rect = chartCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / viewport.layoutScale;
+    const g = chartGeometry();
+    viewport.dragging = true;
+    // Drag the right-side price axis to scale vertically; drag the plot area to pan in 2D.
+    viewport.dragMode = x >= g.plotW ? 'scaleY' : 'pan2d';
+    viewport.dragX = e.clientX;
+    viewport.dragY = e.clientY;
+    // Capture the pointer so dragging continues even when the pointer leaves the canvas.
+    if(chartCanvas.setPointerCapture) chartCanvas.setPointerCapture(e.pointerId);
+    wrap.style.cursor = viewport.dragMode === 'scaleY' ? 'ns-resize' : 'grabbing';
+  });
+
+  chartCanvas.addEventListener('pointermove', (e)=>{
+    if(pinch && activePointers.size === 2) return;
+    const rect = chartCanvas.getBoundingClientRect();
+    viewport.hoverX = (e.clientX - rect.left) / viewport.layoutScale;
+    viewport.hoverY = (e.clientY - rect.top) / viewport.layoutScale;
+
+    if(viewport.dragging){
+      const dx = (e.clientX - viewport.dragX) / viewport.layoutScale;
+      const dy = (e.clientY - viewport.dragY) / viewport.layoutScale;
+      const g = chartGeometry();
+      if(viewport.dragMode === 'scaleY'){
+        // Scale price rows vertically from the dedicated right-side Y axis.
+        viewport.zoomY = clamp(viewport.zoomY * Math.exp(-dy * 0.01), 0.35, 6);
+      }else{
+        // Free two-dimensional panning inside the plot area.
+        const maxHistory = Math.max(0, candleOrder.length - 1);
+        viewport.panX = clamp(viewport.panX + dx / g.colW, -2, maxHistory + 2);
+        viewport.panY += dy / g.rowH;
+      }
+      viewport.dragX = e.clientX;
+      viewport.dragY = e.clientY;
+    }else{
+      const g = chartGeometry();
+      wrap.style.cursor = viewport.hoverX >= g.plotW ? 'ns-resize' : 'crosshair';
+    }
+  });
+
+  const stopDrag = ()=>{
+    if(!viewport.dragging) return;
+    viewport.dragging = false;
+    viewport.dragMode = null;
+    const g = chartGeometry();
+    wrap.style.cursor = viewport.hoverX !== null && viewport.hoverX >= g.plotW ? 'ns-resize' : 'crosshair';
+  };
+  chartCanvas.addEventListener('pointerup', stopDrag);
+  chartCanvas.addEventListener('pointercancel', stopDrag);
+  // Fallback for browsers where pointer capture is interrupted.
+  window.addEventListener('pointerup', stopDrag);
+  window.addEventListener('pointercancel', stopDrag);
+  chartCanvas.addEventListener('pointerleave', ()=>{
+    if(!viewport.dragging){ viewport.hoverX=null; viewport.hoverY=null; }
+  });
+
+
+// Wrapper-level fallback makes 2D panning work even when the canvas is covered by
+// another element or the pointer starts near an axis edge.
+wrap.addEventListener('pointerdown', (e)=>{
+  if(e.target === chartCanvas) return;
+  viewport.autoCenter = false;
+  e.preventDefault();
+  viewport.dragging=true; viewport.dragMode='pan2d';
+  viewport.dragX=e.clientX; viewport.dragY=e.clientY;
+  wrap.setPointerCapture?.(e.pointerId);
+  wrap.style.cursor='grabbing';
+});
+wrap.addEventListener('pointermove', (e)=>{
+  if(!viewport.dragging || e.target === chartCanvas) return;
+  const dx=(e.clientX-viewport.dragX)/viewport.layoutScale;
+  const dy=(e.clientY-viewport.dragY)/viewport.layoutScale;
+  const g=chartGeometry();
+  viewport.panX += dx/g.colW;
+  viewport.panY += dy/g.rowH;
+  viewport.dragX=e.clientX; viewport.dragY=e.clientY;
+});
+wrap.addEventListener('pointerup', stopDrag);
+wrap.addEventListener('pointercancel', stopDrag);
+
+  chartCanvas.addEventListener('dblclick', ()=>{
+    viewport.zoomX = 1;
+    viewport.zoomY = 1;
+    viewport.layoutScale = 1;
+    viewport.panX = 0;
+    viewport.panY = 0;
+    viewport.priceCenter = Number.isFinite(lastPrice) ? lastPrice : null;
+    viewport.autoCenter = false;
+  });
+}
+
+function drawHeatCell(x1,x2,y,h,bidFrac,hot,volumeForLabel,showLabel){
+  // shared cell painter for the order-book heatmap layer: colors green when
+  // bid-heavy, red when ask-heavy, purple when balanced+hot — same language
+  // as the candle footprint legend — and stamps a size label when there's room.
+  const w=Math.max(1,x2-x1-2);
+  const c=heatColor(bidFrac, 1-bidFrac, hot);
+  const alpha=0.06+0.70*hot;
+  chartCtx.fillStyle=`rgba(${c.r},${c.g},${c.b},${alpha.toFixed(3)})`;
+  chartCtx.fillRect(x1+1,y-h/2+1,w,Math.max(1,h-2));
+  if(showLabel && w>=10 && h>=8 && volumeForLabel>0){
+    const fs=clamp(Math.min(h*.64,w*.30),7,13);
+    chartCtx.font=`${fs}px ui-monospace, SFMono-Regular, monospace`;
+    chartCtx.fillStyle='rgba(255,255,255,0.98)';
+    chartCtx.shadowColor='rgba(0,0,0,0.95)'; chartCtx.shadowBlur=3;
+    chartCtx.textAlign='center'; chartCtx.textBaseline='middle';
+    chartCtx.fillText(fmtVol(volumeForLabel), x1+w/2+1, y+0.5);
+    chartCtx.shadowBlur=0;
+  }
+}
+
+function heatColor(buy, sell, intensity){
+  const total=buy+sell;
+  const ratio=total ? buy/total : 0.5;
+  let r,gc,b;
+  if(Math.abs(ratio-0.5)<0.10 && intensity>0.38){ r=139; gc=111; b=217; }
+  else if(ratio>=0.5){ r=62; gc=207; b=142; }
+  else { r=239; gc=91; b=91; }
+  return {r,g:gc,b,ratio};
+}
+
+// Aggregate raw order-flow into the exact grid currently visible on screen.
+// Zoomed out = large time/price buckets. Zoomed in = raw footprint levels.
+function buildHeatmapLOD(visible,g){
+  // BACKGROUND LAYER ONLY: aggregate independent resting-liquidity/order-book heatmap.
+  const timeSpan=Math.max(1, Math.ceil(26/g.colW));
+  const priceSpan=Math.max(1, Math.ceil(14/g.rowH));
+  const cells=new Map(); let max=1;
+  visible.forEach(({t,idx})=>{
+    const m=liquidityHeatmap.get(t); if(!m)return;
+    m.forEach((v,pk)=>{
+      const p=parseFloat(pk);
+      const priceBucket=Math.round(p/(cfg.tick*priceSpan));
+      const timeBucket=Math.floor(idx/timeSpan);
+      const key=timeBucket+'|'+priceBucket;
+      let cell=cells.get(key);
+      if(!cell){cell={timeBucket,priceBucket,bid:0,ask:0};cells.set(key,cell);}
+      cell.bid+=v.bid; cell.ask+=v.ask;
+      max=Math.max(max,cell.bid+cell.ask);
+    });
+  });
+  return {cells:[...cells.values()],max,timeSpan,priceSpan};
+}
+function draw(){
+  applyRenderScale(chartCtx);
+  const g=chartGeometry();
+  const {W,H,plotW,colW,rowH}=g;
+  chartCtx.clearRect(0,0,W,H);
+  chartCtx.fillStyle='#ffffff';
+  chartCtx.fillRect(0,0,W,H);
+
+  if(candleOrder.length===0){ requestAnimationFrame(draw); return; }
+
+  const leftIndex=indexAtX(0,g);
+  const rightIndex=indexAtX(plotW,g);
+  const from=Math.max(0,Math.floor(Math.min(leftIndex,rightIndex))-2);
+  const to=Math.min(candleOrder.length-1,Math.ceil(Math.max(leftIndex,rightIndex))+2);
+  const visible=[];
+  for(let i=from;i<=to;i++) visible.push({t:candleOrder[i],idx:i});
+
+  // LOD state: heatmap -> candles -> footprint. Footprint visibility is now
+  // geometry-driven instead of depending only on horizontal zoom. This prevents
+  // it from disappearing when the chart is zoomed/scaled enough to fit it, and
+  // prevents partial/spilling cells when there is not enough room.
+  const lod = colW < 32 ? 0 : colW < 62 ? 1 : 2;
+
+  // STRICT footprint fit gate: do not show a partial/"leaking" footprint.
+  // The complete bid/ask cell must have enough horizontal room for BOTH sides
+  // and enough vertical room for one full price row.  This uses the exact
+  // footprint geometry below, not a loose zoom threshold.
+  // Footprint is constrained to the candle body and never allowed to shrink into adjacent columns.
+  const footprintBodyW = Math.max(24, colW*0.34);
+  // Use a wide footprint body at the default viewport so order-flow is visible
+  // immediately; numeric labels still wait for sufficient per-side text space.
+  const footprintFits = footprintBodyW >= 10 && rowH >= 12;
+  const showNumericValues = viewport.zoomX > 1.10 || viewport.zoomY > 1.10;
+  const hm=buildHeatmapLOD(visible,g);
+  const sensNorm=Math.max(hm.max, 0.0001);
+
+  // subtle screen grid
+  chartCtx.strokeStyle='rgba(255,255,255,0.035)';
+  chartCtx.lineWidth=1;
+  const screenGridY=Math.max(18,rowH*Math.max(1,Math.ceil(18/rowH)));
+  for(let y=0;y<=H;y+=screenGridY){
+    chartCtx.beginPath(); chartCtx.moveTo(0,y+.5); chartCtx.lineTo(plotW,y+.5); chartCtx.stroke();
+  }
+
+  // --- ORDER-FLOW HEATMAP ---
+  // Base matrix: every visible TIME × PRICE bucket gets a cell. This keeps the
+  // background continuous like an order-book heatmap instead of leaving holes
+  // wherever a particular snapshot has no explicit liquidity record.
+  {
+    const timeBuckets=Math.ceil((to-from+1)/hm.timeSpan);
+    const topPrice=priceAtY(0,g);
+    const bottomPrice=priceAtY(H,g);
+    const pStep=cfg.tick*hm.priceSpan;
+    const pMin=Math.floor(bottomPrice/pStep)-1;
+    const pMax=Math.ceil(topPrice/pStep)+1;
+
+    // Real liquidity cells override fallback labels at the exact same TIME × PRICE
+    // bucket. This keeps the heatmap fully populated while guaranteeing one label
+    // per cell instead of drawing fallback + real values on top of each other.
+    const realHeatKeys=new Set();
+    hm.cells.forEach(cell=>realHeatKeys.add(cell.timeBucket+":"+cell.priceBucket));
+
+    for(let tb=0;tb<timeBuckets;tb++){
+      const firstIdx=from+tb*hm.timeSpan;
+      const lastIdx=Math.min(to+1,firstIdx+hm.timeSpan);
+      const x1=xOfIndex(firstIdx,g), x2=xOfIndex(lastIdx,g);
+      if(x2<0||x1>plotW) continue;
+
+      // derive a stable fallback bid/ask split from the candle volume profile so
+      // historical columns are populated even between depth snapshots. Below the
+      // reference close reads as resting bid (green), above as resting ask (red).
+      let refVol=1, refPrice=lastPrice;
+      const ref=candles.get(candleOrder[Math.min(to,Math.max(from,Math.floor((firstIdx+lastIdx)/2))) ]);
+      if(ref){ refVol=Math.max(1,ref.v||1); refPrice=ref.c??refPrice; }
+
+      for(let pb=pMin;pb<=pMax;pb++){
+        const p=pb*pStep;
+        const y=yOfPrice(p,g);
+        const h=Math.max(1,rowH*hm.priceSpan);
+        if(y+h/2<0||y-h/2>H) continue;
+        const dist=Math.abs(p-refPrice)/Math.max(pStep,cfg.tick);
+        const wave=.25+.75*Math.abs(Math.sin(tb*1.37+pb*.71));
+        const fallback=Math.exp(-dist*.14)*wave*Math.sqrt(refVol);
+        const baseHot=Math.min(1, fallback/Math.max(1,Math.sqrt(refVol)*.95));
+        const side=(refPrice-p)/Math.max(pStep*1.5,cfg.tick*2);
+        const bidFrac=clamp(0.5+side*0.5,0,1);
+        // Always label the background heatmap when the aggregated cells are large enough.
+        // This is independent of candle footprints.
+        const fallbackHasReal=realHeatKeys.has(tb+":"+pb);
+        drawHeatCell(x1,x2,y,h,bidFrac,baseHot,fallback*Math.sqrt(refVol)*4,showNumericValues && !fallbackHasReal);
+      }
+    }
+
+    hm.cells.forEach(cell=>{
+      const p=cell.priceBucket*cfg.tick*hm.priceSpan;
+      const firstIdx=cell.timeBucket*hm.timeSpan;
+      const lastIdx=firstIdx+hm.timeSpan;
+      const x1=xOfIndex(firstIdx,g);
+      const x2=xOfIndex(lastIdx,g);
+      const y=yOfPrice(p,g);
+      const h=Math.max(1,rowH*hm.priceSpan);
+      if(x2<0 || x1>plotW || y+h/2<0 || y-h/2>H) return;
+
+      const total=cell.bid+cell.ask;
+      const intensity=Math.min(1,total/Math.max(sensNorm,0.0001));
+      const bidFrac=total>0?cell.bid/total:0.5;
+      // draw labels here whenever this bucket is real (not the fabricated fallback);
+      // suppressed only once the per-candle full footprint layer takes over (lod 2)
+      // to avoid stacking two number systems on top of each other.
+      drawHeatCell(x1,x2,y,h,bidFrac,Math.pow(intensity,.52),total,showNumericValues);
+    });
+  }
+
+  // --- CANDLES: always present, from thin wicks at wide zoom-out to full
+  // bodies up close, so the price path stays visible through every LOD. ---
+  if(showCandles){
+    visible.forEach(({t,idx})=>{
+      const c=candles.get(t); if(!c||c.o==null)return;
+      const x=xOfIndex(idx,g); if(x>plotW||x+colW<0)return;
+      const up=c.c>=c.o, cx=x+colW/2;
+      chartCtx.strokeStyle=up?'rgba(62,207,142,0.98)':'rgba(239,91,91,0.98)';
+      chartCtx.fillStyle=up?'rgba(62,207,142,0.55)':'rgba(239,91,91,0.55)';
+      chartCtx.lineWidth=1;
+      chartCtx.beginPath(); chartCtx.moveTo(cx,yOfPrice(c.h,g)); chartCtx.lineTo(cx,yOfPrice(c.l,g)); chartCtx.stroke();
+      const yo=yOfPrice(c.o,g),yc=yOfPrice(c.c,g),top=Math.min(yo,yc),bh=Math.max(1,Math.abs(yo-yc));
+      const bw=clamp(colW*0.34,1,Math.max(6,colW*.72));
+      chartCtx.fillRect(cx-bw/2,top,bw,bh);
+      if(bw>3) chartCtx.strokeRect(cx-bw/2,top,bw,bh);
+    });
+  }
+
+  // --- FULL FOOTPRINT: ONE UNIFORM VISIBILITY DECISION ---
+  // First test every visible candle using the same intrinsic fit rules.
+  // We deliberately do NOT use viewport-edge clipping here, because max zoom
+  // can place a candle partly outside the viewport even though its footprint
+  // itself is perfectly valid. If any candle cannot fit its complete numbers,
+  // the whole footprint layer hides together.
+  let uniformFootprintFits = !!footprintFits;
+  if(showFootprint && uniformFootprintFits){
+    const testBodyW=footprintBodyW;
+    const testWickGap=Math.max(2, Math.min(5, testBodyW*.08));
+    const testSidePad=Math.max(2, Math.min(5, testBodyW*.08));
+    const testSideW=Math.max(1,(testBodyW-testWickGap-4*testSidePad)/2);
+    for(const {t} of visible){
+      const candle=candles.get(t); if(!candle||candle.o===null) continue;
+      backfillFootprintLevels(t,candle);
+      const m=footprint.get(t) || new Map();
+      const lowBucket=Math.round(candle.l/cfg.tick)*cfg.tick;
+      const highBucket=Math.round(candle.h/cfg.tick)*cfg.tick;
+      const first=Math.round(Math.min(lowBucket,highBucket)/cfg.tick);
+      const last=Math.round(Math.max(lowBucket,highBucket)/cfg.tick);
+      let testFont=clamp(rowH*.48,8,12), widest=0;
+      const measure=()=>{
+        chartCtx.font=`${testFont}px ui-monospace, SFMono-Regular, monospace`;
+        widest=0;
+        for(let pi=first;pi<=last;pi++){
+          const flow=m.get(keyFor(pi*cfg.tick)) || {buy:0,sell:0};
+          if((flow.buy||0)+(flow.sell||0)<=0) continue;
+          widest=Math.max(widest,chartCtx.measureText(fmtVol(flow.sell)).width,chartCtx.measureText(fmtVol(flow.buy)).width);
+        }
+      };
+      measure();
+      while(widest>testSideW && testFont>6){ testFont-=0.5; measure(); }
+      if(rowH < 12){ uniformFootprintFits=false; break; }
+    }
+  }
+
+  if(showFootprint && uniformFootprintFits){
+    let rawMax=1;
+    visible.forEach(({t})=>{ const m=footprint.get(t); if(m)m.forEach(v=>rawMax=Math.max(rawMax,v.buy+v.sell)); });
+    const rawNorm=Math.max(rawMax, 0.0001);
+    visible.forEach(({t,idx})=>{
+      const x=xOfIndex(idx,g);
+      // Do NOT require the entire candle column to fit inside the viewport.
+      // At maximum zoom a candle can be wider than the chart, which previously
+      // caused every footprint to disappear. We only require the footprint body
+      // itself to be visible after its geometry is calculated below.
+      const candle=candles.get(t); if(!candle||candle.o===null)return;
+      backfillFootprintLevels(t,candle);
+      const m=footprint.get(t) || new Map();
+
+      // Build a CONTINUOUS footprint ladder from the candle low to high.
+      // Previously we iterated only Map entries, so untouched price buckets
+      // disappeared and created blank holes. Zero-trade buckets are now drawn
+      // structurally, but no synthetic buy/sell numbers are invented.
+      const lowBucket=Math.round(candle.l/cfg.tick)*cfg.tick;
+      const highBucket=Math.round(candle.h/cfg.tick)*cfg.tick;
+      const start=Math.min(lowBucket,highBucket);
+      const end=Math.max(lowBucket,highBucket);
+
+      // Use integer tick indices to avoid floating-point drift on small ticks.
+      const first=Math.round(start/cfg.tick);
+      const last=Math.round(end/cfg.tick);
+      const cx=x+colW/2;
+      const bodyW=footprintBodyW;
+      const bodyL=cx-bodyW/2;
+      const bodyR=cx+bodyW/2;
+
+      // Strictly avoid partial/leaking footprints, but test the actual
+      // footprint body rather than the full candle width. This keeps the
+      // footprint visible at maximum zoom while still hiding genuinely clipped
+      // footprint bodies at the viewport edges.
+      if(bodyL < 0 || bodyR > plotW) return;
+
+      // ALL-OR-NOTHING FIT CHECK FOR THIS FOOTPRINT COLUMN.
+      // Do not clip individual digits. Instead, find the widest formatted
+      // value in the candle and reduce the font only as far as needed. If the
+      // full bid/ask text still cannot fit, skip the entire footprint column.
+      const wickGap=Math.max(2, Math.min(5, bodyW*.08));
+      const sidePad=Math.max(2, Math.min(5, bodyW*.08));
+      const sideW=Math.max(1,(bodyW-wickGap-4*sidePad)/2);
+      let fpFont=clamp(rowH*.48,8,12);
+      let widest=0;
+      for(let pi=first;pi<=last;pi++){
+        const flow=m.get(keyFor(pi*cfg.tick)) || {buy:0,sell:0};
+        if((flow.buy||0)+(flow.sell||0)<=0) continue;
+        chartCtx.font=`${fpFont}px ui-monospace, SFMono-Regular, monospace`;
+        widest=Math.max(widest,chartCtx.measureText(fmtVol(flow.sell)).width,chartCtx.measureText(fmtVol(flow.buy)).width);
+      }
+      while(widest>sideW && fpFont>6){
+        fpFont-=0.5;
+        chartCtx.font=`${fpFont}px ui-monospace, SFMono-Regular, monospace`;
+        widest=0;
+        for(let pi=first;pi<=last;pi++){
+          const flow=m.get(keyFor(pi*cfg.tick)) || {buy:0,sell:0};
+          if((flow.buy||0)+(flow.sell||0)<=0) continue;
+          widest=Math.max(widest,chartCtx.measureText(fmtVol(flow.sell)).width,chartCtx.measureText(fmtVol(flow.buy)).width);
+        }
+      }
+      const showFootprintText = widest<=sideW && fpFont>=6.5;
+
+      for(let pi=first;pi<=last;pi++){
+        const p=pi*cfg.tick;
+        const y=yOfPrice(p,g);
+        if(y<-rowH||y>H+rowH) continue;
+
+        const flow=m.get(keyFor(p)) || {buy:0,sell:0};
+        const total=flow.buy+flow.sell;
+
+        // IMPORTANT: footprint colour exists only together with visible values.
+        // When the candle is too narrow for the bid/ask numbers, leave the
+        // footprint completely transparent so no coloured boxes remain behind.
+        if(showFootprintText){
+          if(total>0){
+            const intensity=Math.min(1,total/Math.max(rawNorm,0.0001));
+            const hc=heatColor(flow.buy,flow.sell,intensity);
+            const alpha=0.14+0.42*intensity;
+            chartCtx.fillStyle=`rgba(${hc.r},${hc.g},${hc.b},${alpha.toFixed(3)})`;
+            chartCtx.fillRect(bodyL,y-rowH/2+1,Math.max(1,bodyW),Math.max(1,rowH-2));
+          }
+        }
+
+        if(total>0 && showFootprintText && sideW>=8 && rowH>=12){
+          chartCtx.fillStyle='rgba(45,48,50,0.96)';
+          chartCtx.font=`${fpFont}px ui-monospace, SFMono-Regular, monospace`;
+          chartCtx.textBaseline='middle';
+          chartCtx.textAlign='center';
+
+          const left=fmtVol(flow.sell);
+          const right=fmtVol(flow.buy);
+          const leftX=bodyL+sidePad;
+          const leftR=cx-wickGap/2-sidePad;
+          const rightL=cx+wickGap/2+sidePad;
+          const rightR=bodyR-sidePad;
+          const leftCenter=(leftX+leftR)/2;
+          const rightCenter=(rightL+rightR)/2;
+
+          // Values are drawn only after the complete column has passed the
+          // fit check above, so no individual digit can be cut off.
+          if(left) chartCtx.fillText(left,leftCenter,y);
+          if(right) chartCtx.fillText(right,rightCenter,y);
+        }
+
+        // Keep the split only when the footprint itself is visible.
+        if(showFootprintText){
+          chartCtx.strokeStyle='rgba(70,70,70,0.28)';
+          chartCtx.lineWidth=1;
+          chartCtx.beginPath();
+          chartCtx.moveTo(cx+.5,y-rowH/2+2);
+          chartCtx.lineTo(cx+.5,y+rowH/2-2);
+          chartCtx.stroke();
+        }
+      }
+    });
+  }
+
+  // vertical guides at raw candle boundaries when zoomed close.
+  if(lod>=1){
+    chartCtx.strokeStyle='rgba(255,255,255,0.035)';
+    visible.forEach(({idx})=>{ const x=xOfIndex(idx,g); chartCtx.beginPath();chartCtx.moveTo(x+.5,0);chartCtx.lineTo(x+.5,H);chartCtx.stroke(); });
+  }
+
+  // PRICE AXIS: draw in physical screen coordinates so pinch scaling changes
+  // the visible price range, never the axis strip or the text size.
+  const physicalW=chartCanvas.clientWidth, physicalH=chartCanvas.clientHeight;
+  const scale=viewport.layoutScale;
+  const axisLeft=physicalW-AXIS_W;
+  const currentBullish=isCurrentCandleBullish();
+  const currentPriceColor=currentBullish?'#3ecf8e':'#ff5c70';
+  const currentPriceBg=currentBullish?'#e9f8f1':'#ffe9ed';
+  const currentPriceLine=currentBullish?'rgba(62,207,142,0.65)':'rgba(255,92,112,0.65)';
+
+  applyScreenTransform(chartCtx);
+  chartCtx.fillStyle='#ffffff'; chartCtx.fillRect(axisLeft,0,AXIS_W,physicalH);
+  chartCtx.strokeStyle='rgba(255,255,255,0.08)'; chartCtx.beginPath();chartCtx.moveTo(axisLeft+.5,0);chartCtx.lineTo(axisLeft+.5,physicalH);chartCtx.stroke();
+  chartCtx.textAlign='left'; chartCtx.textBaseline='middle';
+  chartCtx.font='11px ui-monospace, monospace';
+
+  // Keep tick spacing visually readable while deriving every value from the
+  // scaled chart geometry. yVirtual -> price, yPhysical -> fixed UI position.
+  const physicalRowH=rowH*scale;
+  const labelEvery=Math.max(1,Math.ceil(24/Math.max(1,physicalRowH)));
+  const step=rowH*labelEvery;
+  for(let y=H/2%step;y<=H;y+=step){
+    const py=y*scale;
+    const p=priceAtY(y,g),near=Math.abs(p-lastPrice)<cfg.tick*(labelEvery*.45);
+    if(near){chartCtx.fillStyle=currentPriceBg;chartCtx.fillRect(axisLeft,py-9,AXIS_W,18);}
+    chartCtx.fillStyle=near?currentPriceColor:'#5c6a74';
+    chartCtx.font=near?'bold 11px ui-monospace, monospace':'11px ui-monospace, monospace';
+    chartCtx.fillText(fmtPrice(p),axisLeft+6,py);
+  }
+
+  const lastY=yOfPrice(lastPrice,g);
+  const markerH=20;
+  const markerYP=clamp(lastY*scale, markerH/2, physicalH-markerH/2);
+  if(lastY>=0&&lastY<=H){
+    chartCtx.strokeStyle=currentPriceLine; chartCtx.setLineDash([4,4]);
+    chartCtx.beginPath();chartCtx.moveTo(0,lastY*scale+.5);chartCtx.lineTo(axisLeft,lastY*scale+.5);chartCtx.stroke();chartCtx.setLineDash([]);
+  }
+  chartCtx.fillStyle=currentPriceBg; chartCtx.fillRect(axisLeft+1,markerYP-markerH/2,AXIS_W-2,markerH);
+  chartCtx.strokeStyle=currentPriceColor; chartCtx.lineWidth=1; chartCtx.strokeRect(axisLeft+1.5,markerYP-markerH/2+.5,AXIS_W-3,markerH-1);
+  chartCtx.fillStyle=currentPriceColor; chartCtx.font='bold 11px ui-monospace, monospace'; chartCtx.fillText(fmtPrice(lastPrice),axisLeft+6,markerYP);
+
+  if(lastY<0 || lastY>H){
+    const edgeY=lastY<0 ? 2 : physicalH-2;
+    chartCtx.fillStyle=currentPriceColor; chartCtx.beginPath();
+    if(lastY<0){chartCtx.moveTo(physicalW-8,edgeY);chartCtx.lineTo(physicalW-3,edgeY+6);chartCtx.lineTo(physicalW-13,edgeY+6);}
+    else{chartCtx.moveTo(physicalW-8,edgeY);chartCtx.lineTo(physicalW-3,edgeY-6);chartCtx.lineTo(physicalW-13,edgeY-6);}
+    chartCtx.closePath();chartCtx.fill();
+  }
+
+  if(viewport.hoverX!==null&&viewport.hoverY!==null&&!viewport.dragging&&viewport.hoverX>=0&&viewport.hoverX<plotW){
+    // Repaint the hover price label in fixed screen coordinates.
+    const hy=viewport.hoverY, py=hy*scale, hp=priceAtY(hy,g);
+    chartCtx.fillStyle='#151b20';chartCtx.fillRect(axisLeft+1,py-10,AXIS_W-2,20);
+    chartCtx.fillStyle='#ffffff';chartCtx.font='11px ui-monospace, monospace';chartCtx.textAlign='left';chartCtx.fillText(fmtPrice(hp),axisLeft+6,py);
+  }
+
+  drawVolume(visible,g);
+  requestAnimationFrame(draw);
+}
+
+function drawVolume(visible,g){
+  // The lower statistics panel shares the EXACT X geometry of the chart.
+  // Every metric cell is drawn from xOfIndex(idx,g) with the same colW,
+  // so panning and zooming keep it locked to its candle column.
+  applyRenderScale(volCtx);
+  const scale = viewport.layoutScale;
+  const W=volCanvas.clientWidth/scale, H=volCanvas.clientHeight/scale;
+  const textScale = 1 / Math.max(0.01, scale);
+  volCtx.clearRect(0,0,W,H);
+  // Match the chart price Y-axis background exactly.
+  volCtx.fillStyle='#ffffff';
+  volCtx.fillRect(0,0,W,H);
+
+  const rows=[
+    {label:'Delta', signed:true, vals:[]},
+    {label:'Max Δ', signed:true, vals:[]},
+    {label:'Min Δ', signed:true, vals:[]},
+    {label:'Cumulative', signed:true, vals:[]},
+    {label:'Volume', signed:false, vals:[]}
+  ];
+
+  let cumulative=0;
+  visible.forEach(({t,idx})=>{
+    const c=candles.get(t);
+    let delta=0,maxD=0,minD=0,buy=0,sell=0;
+    const fp=footprint.get(t);
+    if(fp){
+      fp.forEach(cell=>{
+        buy+=cell.buy||0; sell+=cell.sell||0;
+        const d=(cell.buy||0)-(cell.sell||0);
+        delta+=d; maxD=Math.max(maxD,d); minD=Math.min(minD,d);
+      });
+    }
+    cumulative+=delta;
+    rows[0].vals.push({idx,v:delta});
+    rows[1].vals.push({idx,v:maxD});
+    rows[2].vals.push({idx,v:minD});
+    rows[3].vals.push({idx,v:cumulative});
+    rows[4].vals.push({idx,v:(c&&c.v)||buy+sell});
+  });
+
+  const plotW=Math.max(1,g.plotW);
+  const axisW=Math.max(1,W-plotW); // same right-side axis width as chart
+  const rowH=H/rows.length;
+
+  // Horizontal row separators span the chart area; metric labels live in the
+  // same right-side axis strip as the chart price scale, preserving X alignment.
+  volCtx.font=`700 ${9*textScale}px ui-monospace,SFMono-Regular,Consolas,monospace`;
+  volCtx.textBaseline='middle';
+  rows.forEach((row,ri)=>{
+    const y=ri*rowH;
+    volCtx.fillStyle='#ffffff';
+    volCtx.fillRect(plotW,y,axisW,rowH);
+    volCtx.strokeStyle='rgba(190,195,205,.55)';
+    volCtx.beginPath(); volCtx.moveTo(0,y+.5); volCtx.lineTo(W,y+.5); volCtx.stroke();
+    volCtx.fillStyle='#667085';
+    volCtx.textAlign='left';
+    volCtx.fillText(row.label,plotW+6,y+rowH/2);
+  });
+
+  // Draw each stat exactly over its matching candle column.
+  rows.forEach((row,ri)=>{
+    const maxAbs=Math.max(1,...row.vals.map(o=>Math.abs(o.v)));
+    row.vals.forEach(({idx,v})=>{
+      const x=xOfIndex(idx,g);
+      const w=g.colW;
+      const y=ri*rowH;
+      if(x+w<0 || x>plotW) return;
+      const pct=Math.abs(v)/maxAbs;
+      const positive=v>0, negative=v<0;
+      const fillW=Math.min(w,Math.max(0,pct*w));
+      volCtx.fillStyle=positive?'rgba(38,166,154,.14)':negative?'rgba(239,83,80,.14)':'rgba(120,130,145,.08)';
+      volCtx.fillRect(x,y,fillW,rowH-1);
+      volCtx.strokeStyle='rgba(120,130,145,.20)';
+      volCtx.strokeRect(x+.5,y+.5,w,rowH-1);
+      const text=(row.signed?(v>=0?'+':''):'')+fmtVol(Math.abs(v));
+      volCtx.fillStyle=positive?'#16806f':negative?'#c53f45':'#667085';
+      // Browser-style layout scaling must never make order-flow numbers smaller/larger.
+      volCtx.font=`${9*textScale}px ui-monospace,SFMono-Regular,Consolas,monospace`;
+      volCtx.textAlign='center';
+      volCtx.fillText(text,x+w/2,y+rowH/2);
+    });
+  });
+
+  // Fixed lower definition strip: never scale the boxes or their labels.
+  applyScreenTransform(volCtx);
+  const physicalW=volCanvas.clientWidth, physicalH=volCanvas.clientHeight;
+  const fixedAxisLeft=physicalW-AXIS_W;
+  const fixedRowH=physicalH/rows.length;
+  rows.forEach((row,ri)=>{
+    const y=ri*fixedRowH;
+    volCtx.fillStyle='#ffffff';
+    volCtx.fillRect(fixedAxisLeft,y,AXIS_W,fixedRowH);
+    volCtx.strokeStyle='rgba(180,185,195,.72)'; volCtx.lineWidth=1;
+    volCtx.strokeRect(fixedAxisLeft+.5,y+.5,AXIS_W-1,Math.max(0,fixedRowH-1));
+    volCtx.fillStyle='#4b5563'; volCtx.font='700 9px ui-monospace,SFMono-Regular,Consolas,monospace';
+    volCtx.textAlign='left'; volCtx.textBaseline='middle';
+    volCtx.fillText(row.label,fixedAxisLeft+6,y+fixedRowH/2);
+  });
+  volCtx.strokeStyle='rgba(120,130,145,.32)';
+  volCtx.beginPath(); volCtx.moveTo(fixedAxisLeft+.5,0); volCtx.lineTo(fixedAxisLeft+.5,physicalH); volCtx.stroke();
+}
+
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+buildSymbolButtons();
+buildIntervalButtons();
+document.getElementById('ladderSym').textContent = cfg.label;
+resizeCanvases();
+installChartInteractions();
+connect();
+requestAnimationFrame(draw);
+setInterval(()=>{ renderLadder(); renderFooterDepth(); }, 250);
+new ResizeObserver(resizeCanvases).observe(document.getElementById('chartwrap'));
+new ResizeObserver(resizeCanvases).observe(document.getElementById('volwrap'));
+
+})();
+</script>
+</body>
+</html>
