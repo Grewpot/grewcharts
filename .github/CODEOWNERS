@@ -1,0 +1,12 @@
+# GrewCharts Code Owners
+
+# Landing page and deployment configuration
+/index.html @Grewpot
+/vercel.json @Grewpot
+/LICENSE @Grewpot
+
+# GitHub configuration
+/.github/ @Grewpot
+
+# Core application
+/grewcharts.html @Grewpot
